@@ -1,0 +1,287 @@
+
+<h2 class="sr-only">Interactive distribution visualizer: morph between bell curve, box plot, and cumulative frequency curve. See the measures of central tendency at the bottom. Either use the slider or click the Animate button.</h2>
+<style>
+.dbtn{padding:6px 14px;font-size:20px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer;transition:background .15s,color .15s}
+.dbtn.on{background:var(--color-background-info);color:var(--color-text-info);border-color:var(--color-border-info);font-weight:500}
+.sc{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:10px 12px}
+.sv{font-size:24px;font-weight:500;line-height:1.3}
+.slb{font-size:20px;color:var(--color-text-secondary);margin-top:2px}
+</style>
+
+<div style="display:flex;flex-wrap:wrap;gap:8px;margin:1rem 0 0.5rem">
+  <button class="dbtn on" id="b0" onclick="setDist(0)">Symmetric</button>
+  <button class="dbtn" id="b1" onclick="setDist(1)">Positively skewed →</button>
+  <button class="dbtn" id="b2" onclick="setDist(2)">← Negatively skewed</button>
+</div>
+
+<p id="clabel" aria-live="polite" style="font-size:20px;color:var(--color-text-secondary);margin:0 0 0.5rem;min-height:20px"></p>
+
+<div id="canwrap" style="width:100%;aspect-ratio:8/3;min-height:220px;position:relative">
+  <canvas id="dc" role="img" aria-label="Statistical distribution visualization" style="width:100%;height:100%;display:block"></canvas>
+</div>
+
+<div style="margin:0.75rem 0 0.25rem">
+  <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+    <span style="font-size:26px;px;color:var(--color-text-secondary)">Bell curve</span>
+    <span style="font-size:26px;color:var(--color-text-secondary)">Box plot</span>
+    <span style="font-size:26px;color:var(--color-text-secondary)">Cumulative</span>
+  </div>
+  <input type="range" id="morphsl" min="0" max="200" value="0" step="1" style="width:100%">
+</div>
+
+<div style="display:flex;align-items:center;gap:14px;margin:0.5rem 0 0.75rem;flex-wrap:wrap">
+  <button id="pbtn" onclick="togglePlay()" style="display:flex;align-items:center;gap:6px;padding:6px 14px;font-size:26px">
+    <i class="ti ti-player-play" id="picon" aria-hidden="true"></i>
+    <span id="plbl">Animate</span>
+  </button>
+  <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:24px;color:var(--color-text-secondary)">
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:18px;height:2px;background:#A32D2D;display:inline-block"></span>Mode</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:18px;height:0;border-top:2px dashed #D85A30;display:inline-block"></span>Median</span>
+    <span style="display:flex;align-items:center;gap:5px"><span style="width:18px;height:0;border-top:2px dotted #BA7517;display:inline-block"></span>Mean</span>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+  <div class="sc"><div class="sv" id="sv0" style="color:#A32D2D">—</div><div class="slb" id="sl0">Mode</div></div>
+  <div class="sc"><div class="sv" id="sv1" style="color:#D85A30">—</div><div class="slb" id="sl1">Median</div></div>
+  <div class="sc"><div class="sv" id="sv2" style="color:#BA7517">—</div><div class="slb" id="sl2">Mean</div></div>
+  <div class="sc"><div class="sv" id="sv3">—</div><div class="slb" id="sl3">Std Dev</div></div>
+</div>
+
+<script>
+const N=500,DX=100/N;
+const XS=Array.from({length:N+1},(_,i)=>i*DX);
+
+function npdf(x){return Math.exp(-0.5*x*x)/2.5066282746}
+function ncdf(x){
+  const a=[0.254829592,-0.284496736,1.421413741,-1.453152027,1.061405429],p2=0.3275911;
+  const sg=x<0?-1:1,ax=Math.abs(x),t=1/(1+p2*ax);
+  const y=1-((((a[4]*t+a[3])*t+a[2])*t+a[1])*t+a[0])*t*Math.exp(-ax*ax);
+  return 0.5*(1+sg*y);
+}
+function snpdf(x,xi,om,al){const z=(x-xi)/om;return(2/om)*npdf(z)*ncdf(al*z)}
+
+const DEFS=[{xi:50,om:11,al:0},{xi:36,om:17,al:4.5},{xi:64,om:17,al:-4.5}];
+
+function buildD(d){
+  const raw=XS.map(x=>snpdf(x,d.xi,d.om,d.al));
+  const tot=raw.reduce((s,v)=>s+v)*DX;
+  const pdf=raw.map(v=>Math.max(0,v/tot));
+  const cdf=[0];
+  for(let i=1;i<=N;i++)cdf.push(Math.min(1,cdf[i-1]+pdf[i-1]*DX));
+  const mean=XS.reduce((s,x,i)=>s+x*pdf[i]*DX,0);
+  const variance=XS.reduce((s,x,i)=>s+(x-mean)**2*pdf[i]*DX,0);
+  const sd=Math.sqrt(variance);
+  const modeIdx=pdf.reduce((mi,v,i,a)=>v>a[mi]?i:mi,0);
+  const mode=XS[modeIdx];
+  function qf(prob){
+    let i=cdf.findIndex(c=>c>=prob);
+    if(i<=0)return XS[0];if(i>N)return XS[N];
+    return XS[i-1]+((prob-cdf[i-1])/(cdf[i]-cdf[i-1]))*DX;
+  }
+  const median=qf(0.5),q1=qf(0.25),q3=qf(0.75),iqr=q3-q1;
+  const wlo=Math.max(0,q1-1.5*iqr),whi=Math.min(100,q3+1.5*iqr);
+  return{pdf,cdf,mean,median,mode,sd,q1,q3,iqr,wlo,whi};
+}
+
+const DD=DEFS.map(buildD);
+let cur=0,mv=0,playing=false,pdir=1,aniId=null,W=640,H=240,DPR=1;
+
+const canvas=document.getElementById('dc');
+const ctx=canvas.getContext('2d');
+
+const BC='#0F6E56',BF='#1D9E75',XC='#185FA5',XF='#378ADD',CC='#534AB7';
+const MC='#A32D2D',DC2='#D85A30',AC='#BA7517';
+
+function ss(t){return t*t*(3-2*t)}
+function xc(v,p){return p.PL+(v/100)*p.PW}
+function ybd(v,mx,p){return p.PT+p.PH-(v/mx)*p.PH}
+function ycd(v,p){return p.PT+p.PH-v*p.PH}
+function gp(){const PL=52,PR=12,PT=16,PB=50;return{PL,PR,PT,PB,PW:W-PL-PR,PH:H-PT-PB}}
+
+function draw(){
+  const dk=matchMedia('(prefers-color-scheme:dark)').matches;
+  const axC=dk?'rgba(255,255,255,0.35)':'#9E9D96';
+  const grC=dk?'rgba(255,255,255,0.07)':'rgba(136,135,128,0.13)';
+  const txC=dk?'rgba(255,255,255,0.55)':'#5F5E5A';
+  ctx.clearRect(0,0,W*DPR,H*DPR);
+  ctx.save();ctx.scale(DPR,DPR);
+  const p=gp();
+  const dd=DD[cur];
+  const t1=mv<=100?mv/100:1,t2=mv>=100?(mv-100)/100:0;
+  const ba=mv<=100?ss(1-t1):0,bxa=mv<=100?ss(t1):ss(1-t2),ca=mv>=100?ss(t2):0;
+
+  ctx.strokeStyle=axC;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(p.PL,p.PT+p.PH);ctx.lineTo(p.PL+p.PW,p.PT+p.PH);ctx.stroke();
+  ctx.fillStyle=txC;ctx.font='11px sans-serif';ctx.textAlign='center';
+  for(let v=0;v<=100;v+=20){
+    const x=xc(v,p);
+    ctx.strokeStyle=axC;ctx.lineWidth=0.75;
+    ctx.beginPath();ctx.moveTo(x,p.PT+p.PH);ctx.lineTo(x,p.PT+p.PH+4);ctx.stroke();
+    ctx.fillText(v,x,p.PT+p.PH+15);
+  }
+  ctx.fillText('Score (0–100)',p.PL+p.PW/2,p.PT+p.PH+32);
+
+  const ya=Math.max(ba,ca);
+  if(ya>0.01){
+    ctx.save();ctx.globalAlpha=ya;
+    ctx.strokeStyle=axC;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(p.PL,p.PT);ctx.lineTo(p.PL,p.PT+p.PH);ctx.stroke();
+    const ylbl=ca>ba?'Proportion':'Density';
+    ctx.save();ctx.translate(p.PL-36,p.PT+p.PH/2);ctx.rotate(-Math.PI/2);
+    ctx.textAlign='center';ctx.fillStyle=txC;ctx.font='11px sans-serif';
+    ctx.fillText(ylbl,0,0);ctx.restore();
+    if(ca>0.3){
+      ctx.globalAlpha=Math.min(ca,1)*ya;
+      ctx.font='10px sans-serif';ctx.textAlign='right';ctx.fillStyle=txC;
+      [0,0.25,0.5,0.75,1].forEach(v=>{ctx.fillText(v.toFixed(2),p.PL-5,ycd(v,p)+4)});
+    }
+    ctx.restore();
+  }
+
+  if(ba>0.01)dBell(p,dd,ba,grC);
+  if(bxa>0.01)dBox(p,dd,bxa,grC,txC);
+  if(ca>0.01)dCum(p,dd,ca,grC,txC);
+  ctx.restore();
+  updStats(dd);
+  updLabel();
+}
+
+function dBell(p,dd,alpha,grC){
+  const mx=Math.max(...dd.pdf);
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.strokeStyle=grC;ctx.lineWidth=0.5;
+  [0.25,0.5,0.75,1].forEach(v=>{
+    const y=ybd(v*mx,mx,p);
+    ctx.beginPath();ctx.moveTo(p.PL,y);ctx.lineTo(p.PL+p.PW,y);ctx.stroke();
+  });
+  ctx.beginPath();
+  ctx.moveTo(xc(0,p),ybd(0,mx,p));
+  for(let i=0;i<=N;i++)ctx.lineTo(xc(XS[i],p),ybd(dd.pdf[i],mx,p));
+  ctx.lineTo(xc(100,p),ybd(0,mx,p));
+  ctx.closePath();ctx.fillStyle=BF+'38';ctx.fill();
+  ctx.strokeStyle=BC;ctx.lineWidth=2.5;
+  ctx.beginPath();
+  for(let i=0;i<=N;i++){i===0?ctx.moveTo(xc(XS[i],p),ybd(dd.pdf[i],mx,p)):ctx.lineTo(xc(XS[i],p),ybd(dd.pdf[i],mx,p))}
+  ctx.stroke();
+  [[dd.mode,MC,[]],[dd.median,DC2,[5,4]],[dd.mean,AC,[2,4]]].forEach(([v,c,ds])=>{
+    const x=xc(v,p);
+    ctx.save();ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.setLineDash(ds);
+    ctx.beginPath();ctx.moveTo(x,p.PT);ctx.lineTo(x,p.PT+p.PH);ctx.stroke();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function dBox(p,dd,alpha,grC,txC){
+  ctx.save();ctx.globalAlpha=alpha;
+  const cy=p.PT+p.PH/2,bh=p.PH*0.22;
+  const xQ1=xc(dd.q1,p),xQ3=xc(dd.q3,p),xMed=xc(dd.median,p);
+  const xMean=xc(dd.mean,p),xWL=xc(dd.wlo,p),xWH=xc(dd.whi,p),xMd=xc(dd.mode,p);
+  ctx.strokeStyle=grC;ctx.lineWidth=0.5;
+  ctx.beginPath();ctx.moveTo(p.PL,cy);ctx.lineTo(p.PL+p.PW,cy);ctx.stroke();
+  ctx.strokeStyle=XC;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(xWL,cy);ctx.lineTo(xQ1,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(xQ3,cy);ctx.lineTo(xWH,cy);ctx.stroke();
+  const ch=bh*0.38;
+  [xWL,xWH].forEach(x=>{ctx.beginPath();ctx.moveTo(x,cy-ch);ctx.lineTo(x,cy+ch);ctx.stroke()});
+  ctx.fillStyle=XF+'2A';ctx.fillRect(xQ1,cy-bh,xQ3-xQ1,bh*2);
+  ctx.strokeStyle=XC;ctx.lineWidth=2;ctx.strokeRect(xQ1,cy-bh,xQ3-xQ1,bh*2);
+  ctx.strokeStyle=DC2;ctx.lineWidth=2.5;ctx.setLineDash([5,4]);
+  ctx.beginPath();ctx.moveTo(xMed,cy-bh);ctx.lineTo(xMed,cy+bh);ctx.stroke();ctx.setLineDash([]);
+  const ds=7;
+  ctx.fillStyle=AC;ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(xMean,cy-ds);ctx.lineTo(xMean+ds,cy);ctx.lineTo(xMean,cy+ds);ctx.lineTo(xMean-ds,cy);ctx.closePath();
+  ctx.fill();ctx.stroke();
+  ctx.strokeStyle=MC;ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(xMd,cy-bh*1.75);ctx.lineTo(xMd,cy-bh*1.1);ctx.stroke();
+  ctx.fillStyle=MC;ctx.beginPath();ctx.arc(xMd,cy-bh*1.75,3.5,0,Math.PI*2);ctx.fill();
+  ctx.font='10px sans-serif';ctx.fillStyle=txC;ctx.textAlign='center';
+  [[xQ1,'Q1',dd.q1],[xMed,'Med',dd.median],[xQ3,'Q3',dd.q3],[xWL,'min',dd.wlo],[xWH,'max',dd.whi]].forEach(([x,l,v])=>{
+    ctx.fillText(l,x,cy+bh+14);ctx.fillText(v.toFixed(1),x,cy+bh+26);
+  });
+  ctx.restore();
+}
+
+function dCum(p,dd,alpha,grC,txC){
+  ctx.save();ctx.globalAlpha=alpha;
+  ctx.strokeStyle=grC;ctx.lineWidth=0.5;
+  [0.25,0.5,0.75,1].forEach(v=>{const y=ycd(v,p);ctx.beginPath();ctx.moveTo(p.PL,y);ctx.lineTo(p.PL+p.PW,y);ctx.stroke()});
+  ctx.beginPath();
+  ctx.moveTo(xc(0,p),ycd(0,p));
+  for(let i=0;i<=N;i++)ctx.lineTo(xc(XS[i],p),ycd(dd.cdf[i],p));
+  ctx.lineTo(xc(100,p),ycd(0,p));ctx.closePath();ctx.fillStyle=CC+'16';ctx.fill();
+  ctx.strokeStyle=CC;ctx.lineWidth=2.5;
+  ctx.beginPath();
+  for(let i=0;i<=N;i++){i===0?ctx.moveTo(xc(XS[i],p),ycd(dd.cdf[i],p)):ctx.lineTo(xc(XS[i],p),ycd(dd.cdf[i],p))}
+  ctx.stroke();
+  [[dd.q1,0.25,MC],[dd.median,0.5,DC2],[dd.q3,0.75,AC]].forEach(([xv,yv,c])=>{
+    const cx2=xc(xv,p),cy2=ycd(yv,p);
+    ctx.save();ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(p.PL,cy2);ctx.lineTo(cx2,cy2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx2,cy2);ctx.lineTo(cx2,p.PT+p.PH);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle=c;
+    ctx.beginPath();ctx.arc(cx2,cy2,4,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+const LABELS=[
+  'Shows how scores cluster — the curve\'s peak marks the most common score',
+  'Displays median, spread (IQR), and outlier range without assuming bell shape',
+  'Shows what proportion of scores fall at or below each value on the scale'
+];
+
+function updLabel(){
+  const s=mv<67?0:mv<133?1:2;
+  document.getElementById('clabel').textContent=LABELS[s];
+}
+
+function updStats(dd){
+  const s=mv<67?0:mv<133?1:2;
+  const sets=[
+    [[dd.mode,'Mode',MC],[dd.median,'Median',DC2],[dd.mean,'Mean',AC],[dd.sd,'Std Dev','']],
+    [[dd.mode,'Mode',MC],[dd.median,'Median',DC2],[dd.mean,'Mean',AC],[dd.iqr,'IQR','']],
+    [[dd.q1,'Q1 (25th)',MC],[dd.median,'Median (50th)',DC2],[dd.q3,'Q3 (75th)',AC],[dd.iqr,'IQR','']]
+  ];
+  sets[s].forEach(([v,l,c],i)=>{
+    document.getElementById('sv'+i).textContent=v.toFixed(1);
+    document.getElementById('sl'+i).textContent=l;
+    document.getElementById('sv'+i).style.color=c||'var(--color-text-primary)';
+  });
+}
+
+function setDist(i){
+  cur=i;[0,1,2].forEach(j=>document.getElementById('b'+j).classList.toggle('on',j===i));draw();
+}
+
+document.getElementById('morphsl').addEventListener('input',e=>{mv=+e.target.value;draw()});
+
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('picon').className=playing?'ti ti-player-pause':'ti ti-player-play';
+  document.getElementById('plbl').textContent=playing?'Pause':'Animate';
+  if(playing)loop();else if(aniId){cancelAnimationFrame(aniId);aniId=null}
+}
+
+function loop(){
+  if(!playing)return;
+  mv+=0.9*pdir;
+  if(mv>=200){mv=200;pdir=-1}if(mv<=0){mv=0;pdir=1}
+  document.getElementById('morphsl').value=mv;draw();
+  aniId=requestAnimationFrame(loop);
+}
+
+function resize(){
+  const el=document.getElementById('canwrap');
+  const r=el.getBoundingClientRect();
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=r.width;H=r.height;
+  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+  draw();
+}
+
+new ResizeObserver(resize).observe(document.getElementById('canwrap'));
+resize();
+</script>

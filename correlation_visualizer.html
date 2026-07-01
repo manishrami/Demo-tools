@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correlation Visualizer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#1a1a1a;background:#f9f9f7;padding:20px;max-width:860px;margin:0 auto}
+h1{font-size:18px;font-weight:600;margin-bottom:3px}
+.sub{font-size:13px;color:#666;margin-bottom:14px}
+.ctx{font-size:12px;color:#555;background:#f0f0ee;border-left:3px solid #185FA5;padding:8px 12px;margin-bottom:14px;border-radius:0 4px 4px 0;line-height:1.5}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.lbl{font-size:12px;color:#666;white-space:nowrap}
+button{padding:5px 13px;font-size:13px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#555;cursor:pointer;transition:background .12s}
+button:hover{background:#f0f0ee}
+button.on{background:#e8f0fb;color:#1a4fa0;border-color:#1a4fa0;font-weight:500}
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+input[type=range]{flex:1;accent-color:#185FA5}
+.rval{font-size:22px;font-weight:600;color:#185FA5;min-width:54px;text-align:right}
+.main{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;margin-bottom:12px}
+#cw{flex:1;min-width:280px;aspect-ratio:1/1;max-width:500px;background:#fff;border:1px solid #e0e0de;border-radius:8px;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+.side{flex:1;min-width:180px;display:flex;flex-direction:column;gap:10px}
+.sc{background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:12px 14px}
+.sv{font-size:22px;font-weight:600;line-height:1.2}
+.sl{font-size:11px;color:#888;margin-top:3px}
+.strength{background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:12px 14px}
+.stv{font-size:15px;font-weight:500;line-height:1.3}
+.sts{font-size:11px;color:#888;margin-top:3px}
+.opts{display:flex;align-items:center;gap:8px;font-size:13px;color:#555}
+input[type=checkbox]{width:15px;height:15px;accent-color:#185FA5;cursor:pointer}
+.desc{font-size:13px;color:#555;line-height:1.55;min-height:40px;padding:0 2px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#555;margin-top:8px}
+.li{display:flex;align-items:center;gap:5px}
+.lsw{width:13px;height:13px;border-radius:50%;background:#1D9E75;flex-shrink:0}
+.lreg{width:18px;height:2px;background:#185FA5;flex-shrink:0}
+.lcross{width:18px;height:0;border-top:1.5px dashed rgba(100,100,100,.5);flex-shrink:0}
+.cohen{margin-top:14px;background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:12px 14px}
+.cohen-title{font-size:12px;font-weight:500;color:#444;margin-bottom:8px}
+.cohen-row{display:flex;align-items:center;gap:8px;font-size:12px;color:#555;margin-bottom:5px}
+.cohen-bar-wrap{flex:1;height:8px;background:#f0f0ee;border-radius:4px;overflow:hidden}
+.cohen-bar{height:100%;border-radius:4px;transition:width .3s}
+@media(max-width:560px){.main{flex-direction:column}#cw{max-width:100%}}
+</style>
+</head>
+<body>
+
+<h1>Correlation Visualizer</h1>
+<p class="sub">Rami, Manish K. (2026). Vizualizing correlation and Cohen's effect size. University of North Dakota.</p>
+<p class="ctx"><strong>Clinical context:</strong> Examining the relationship between phonological awareness (CTOPP-2) and reading fluency. Both measures use standard scores (M = 100, SD = 15). Adjust r to explore how the strength and direction of correlation affects the scatter pattern and shared variance. Use the slider for r to see corresponding changes in the plot and the values of r and effect size.</p>
+
+<div class="row">
+  <span class="lbl">SLP scenarios:</span>
+  <button id="s0" onclick="setR(0.00)">No relationship</button>
+  <button id="s1" onclick="setR(0.30)">Weak (.30)</button>
+  <button id="s2" onclick="setR(0.55)" class="on">Moderate (.55)</button>
+  <button id="s3" onclick="setR(0.72)">Strong (.72)</button>
+  <button id="s4" onclick="setR(-0.52)">Negative (−.52)</button>
+</div>
+
+<div class="slider-row">
+  <span class="lbl" style="min-width:50px">r =</span>
+  <input type="range" id="rsl" min="-1" max="1" value="0.55" step="0.01">
+  <span class="rval" id="rv">0.55</span>
+</div>
+
+<div class="main">
+  <div id="cw"><canvas id="sc" role="img" aria-label="Scatter plot showing correlation between phonological awareness and reading fluency standard scores"></canvas></div>
+  <div class="side">
+    <div class="sc">
+      <div class="sv" id="r2v" style="color:#185FA5">0.30</div>
+      <div class="sl">R² (coefficient of determination)</div>
+    </div>
+    <div class="sc">
+      <div class="sv" id="shv" style="color:#0F6E56">30%</div>
+      <div class="sl">Shared variance</div>
+    </div>
+    <div class="strength">
+      <div class="stv" id="strlbl">Moderate positive</div>
+      <div class="sts">Cohen's classification</div>
+    </div>
+    <div class="opts">
+      <input type="checkbox" id="linetog" checked>
+      <label for="linetog">Show regression line</label>
+    </div>
+    <div class="opts">
+      <input type="checkbox" id="meanstog" checked>
+      <label for="meanstog">Show mean crosshairs</label>
+    </div>
+    <div class="cohen">
+      <div class="cohen-title">Cohen's conventions</div>
+      <div class="cohen-row"><span style="min-width:55px">Negligible</span><div class="cohen-bar-wrap"><div class="cohen-bar" id="cb0" style="background:#ccc"></div></div><span id="cd0">|r| &lt; .10</span></div>
+      <div class="cohen-row"><span style="min-width:55px">Small</span><div class="cohen-bar-wrap"><div class="cohen-bar" id="cb1" style="background:#ccc"></div></div><span id="cd1">|r| = .10–.29</span></div>
+      <div class="cohen-row"><span style="min-width:55px">Medium</span><div class="cohen-bar-wrap"><div class="cohen-bar" id="cb2" style="background:#ccc"></div></div><span id="cd2">|r| = .30–.49</span></div>
+      <div class="cohen-row"><span style="min-width:55px">Large</span><div class="cohen-bar-wrap"><div class="cohen-bar" id="cb3" style="background:#ccc"></div></div><span id="cd3">|r| ≥ .50</span></div>
+    </div>
+  </div>
+</div>
+
+<p class="desc" id="desc"></p>
+
+<div class="legend">
+  <span class="li"><span class="lsw"></span>Data point (N = 60)</span>
+  <span class="li"><span class="lreg"></span>Regression line (Ŷ = 100 + r·(X − 100))</span>
+  <span class="li"><span class="lcross"></span>Mean crosshairs (X̄ = Ȳ = 100)</span>
+</div>
+
+<script>
+function mkR(s){let ss=s>>>0;return()=>{ss=Math.imul(1664525,ss)+1013904223>>>0;return ss/4294967296}}
+
+const N=60;
+const rng=mkR(42);
+
+function bm(u1,u2){return Math.sqrt(-2*Math.log(Math.max(u1,.0001)))*Math.cos(2*Math.PI*u2)}
+function norm(a){
+  const mu=a.reduce((s,v)=>s+v)/a.length;
+  const c=a.map(v=>v-mu);
+  const sd=Math.sqrt(c.reduce((s,v)=>s+v*v)/a.length);
+  return c.map(v=>v/sd);
+}
+
+const Xn=norm(Array.from({length:N},()=>bm(rng(),rng())));
+const En=norm(Array.from({length:N},()=>bm(rng(),rng())));
+
+function getPts(r){
+  const sq=Math.sqrt(Math.max(0,1-r*r));
+  return Xn.map((x,i)=>({x:100+x*15,y:100+(r*x+sq*En[i])*15}));
+}
+
+let r=0.55,showLine=true,showMeans=true,W=400,H=400,DP=1;
+const cv=document.getElementById('sc');
+const ctx=cv.getContext('2d');
+
+const SCENARIOS=[
+  {id:'s0',r:0.00},{id:'s1',r:0.30},{id:'s2',r:0.55},{id:'s3',r:0.72},{id:'s4',r:-0.52}
+];
+
+function draw(){
+  ctx.clearRect(0,0,W*DP,H*DP);
+  ctx.save();ctx.scale(DP,DP);
+
+  const PL=60,PR=16,PT=16,PB=54;
+  const pw=W-PL-PR,ph=H-PT-PB;
+  const DL=55,DH=145;
+  function xm(v){return PL+(v-DL)/(DH-DL)*pw}
+  function ym(v){return PT+ph-(v-DL)/(DH-DL)*ph}
+
+  ctx.fillStyle='#fff';ctx.fillRect(PL,PT,pw,ph);
+
+  [60,80,100,120,140].forEach(v=>{
+    ctx.strokeStyle='rgba(0,0,0,.05)';ctx.lineWidth=.5;
+    ctx.beginPath();ctx.moveTo(xm(v),PT);ctx.lineTo(xm(v),PT+ph);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(PL,ym(v));ctx.lineTo(PL+pw,ym(v));ctx.stroke();
+  });
+
+  if(showMeans){
+    ctx.strokeStyle='rgba(80,80,80,.2)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(xm(100),PT);ctx.lineTo(xm(100),PT+ph);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(PL,ym(100));ctx.lineTo(PL+pw,ym(100));ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(80,80,80,.55)';ctx.font='10px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText('X̄ = 100',xm(100)-22,PT+ph-3);
+  }
+
+  if(showLine){
+    const y0=100+r*(DL-100),y1=100+r*(DH-100);
+    ctx.strokeStyle='#185FA5';ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(xm(DL),ym(y0));ctx.lineTo(xm(DH),ym(y1));ctx.stroke();
+  }
+
+  const pts=getPts(r);
+  pts.forEach(p=>{
+    if(p.x<DL-5||p.x>DH+5||p.y<DL-5||p.y>DH+5)return;
+    ctx.fillStyle='#1D9E75';ctx.strokeStyle='rgba(255,255,255,.9)';ctx.lineWidth=1.3;
+    ctx.beginPath();ctx.arc(xm(p.x),ym(p.y),4.5,0,Math.PI*2);ctx.fill();ctx.stroke();
+  });
+
+  ctx.strokeStyle='#ccc';ctx.lineWidth=.75;ctx.strokeRect(PL,PT,pw,ph);
+
+  ctx.fillStyle='#555';ctx.font='11px sans-serif';
+  [60,80,100,120,140].forEach(v=>{
+    const xx=xm(v);
+    ctx.strokeStyle='#bbb';ctx.lineWidth=.75;
+    ctx.beginPath();ctx.moveTo(xx,PT+ph);ctx.lineTo(xx,PT+ph+4);ctx.stroke();
+    ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(v,xx,PT+ph+6);
+    const yy=ym(v);
+    ctx.beginPath();ctx.moveTo(PL-3,yy);ctx.lineTo(PL,yy);ctx.stroke();
+    ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText(v,PL-6,yy);
+  });
+
+  ctx.fillStyle='#444';ctx.font='12px sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillText('Phonological awareness (CTOPP-2 standard score)',PL+pw/2,PT+ph+24);
+  ctx.save();ctx.translate(PL-46,PT+ph/2);ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('Reading fluency (standard score)',0,0);ctx.restore();
+
+  ctx.restore();
+  updateStats();
+}
+
+function updateStats(){
+  const ar=Math.abs(r);
+  const R2=(r*r).toFixed(2);
+  const R2pct=(r*r*100).toFixed(0)+'%';
+  document.getElementById('rv').textContent=r>=0?'+'+r.toFixed(2):r.toFixed(2);
+  document.getElementById('r2v').textContent=R2;
+  document.getElementById('shv').textContent=R2pct;
+  const dir=r<0?' negative':r>0?' positive':'';
+  let lbl,col;
+  if(ar<.10){lbl='Negligible'+dir;col='#888'}
+  else if(ar<.30){lbl='Weak'+dir;col='#854F0B'}
+  else if(ar<.50){lbl='Moderate'+dir;col='#0C447C'}
+  else if(ar<.70){lbl='Strong'+dir;col='#0F6E56'}
+  else if(ar<.90){lbl='Very strong'+dir;col='#2D3C99'}
+  else{lbl='Near-perfect'+dir;col='#1a1a1a'}
+  document.getElementById('strlbl').textContent=lbl;
+  document.getElementById('strlbl').style.color=col;
+  document.getElementById('desc').textContent=getDesc(r);
+
+  SCENARIOS.forEach(s=>document.getElementById(s.id).classList.toggle('on',Math.abs(s.r-r)<.005));
+
+  const bars=[
+    {id:'cb0',active:ar<.10,width:ar<.10?Math.min(ar/.10*100,100):0,col:'#888'},
+    {id:'cb1',active:ar>=.10&&ar<.30,width:ar<.10?0:ar<.30?(ar-.10)/.20*100:100,col:'#854F0B'},
+    {id:'cb2',active:ar>=.30&&ar<.50,width:ar<.30?0:ar<.50?(ar-.30)/.20*100:100,col:'#0C447C'},
+    {id:'cb3',active:ar>=.50,width:ar<.50?0:Math.min((ar-.50)/.50*100,100),col:'#0F6E56'}
+  ];
+  bars.forEach(b=>{
+    const el=document.getElementById(b.id);
+    el.style.width=b.width+'%';
+    el.style.background=b.active?b.col:'#e0e0e0';
+  });
+}
+
+function getDesc(r){
+  const ar=Math.abs(r),R2=(r*r*100).toFixed(0);
+  const dir=r<0?'negative':'positive';
+  if(ar<.10) return `No meaningful ${dir} correlation — R² = ${R2}%. Knowing a student's phonological awareness score tells us essentially nothing about reading fluency. The scatter shows a nearly circular cloud.`;
+  if(ar<.30) return `Weak ${dir} correlation (R² = ${R2}%). Only ${R2}% of reading fluency variance is explained. Typical of loosely related constructs; informative at the group level but unreliable for individual prediction.`;
+  if(ar<.50) return `Moderate ${dir} correlation (R² = ${R2}%). Consistent with phonological awareness → reading fluency relationships in late elementary grades. The association is meaningful but leaves substantial unexplained variance.`;
+  if(ar<.70) return `Strong ${dir} correlation (R² = ${R2}%). Typical of CTOPP-2 Phonological Awareness composite → early word reading (K–Grade 2). This level of association supports the use of phonological measures in reading risk screening.`;
+  if(ar<.90) return `Very strong ${dir} correlation (R² = ${R2}%). Approaches the reliability ceiling of most behavioral measures (test-retest r ≈ .70–.90). At this level, verify that two distinct constructs are being measured.`;
+  return `Near-perfect ${dir} correlation (R² = ${R2}%). Rarely seen between distinct clinical constructs — likely measuring the same underlying variable, or the data contain a serious methodological artifact.`;
+}
+
+function setR(val){
+  r=val;
+  document.getElementById('rsl').value=val;
+  draw();
+}
+
+document.getElementById('rsl').addEventListener('input',e=>{r=+e.target.value;draw()});
+document.getElementById('linetog').addEventListener('change',e=>{showLine=e.target.checked;draw()});
+document.getElementById('meanstog').addEventListener('change',e=>{showMeans=e.target.checked;draw()});
+
+function rsz(){
+  const rect=document.getElementById('cw').getBoundingClientRect();
+  DP=Math.min(window.devicePixelRatio||1,2);
+  W=rect.width;H=rect.height;
+  cv.width=Math.round(W*DP);cv.height=Math.round(H*DP);
+  draw();
+}
+new ResizeObserver(rsz).observe(document.getElementById('cw'));
+rsz();
+</script>
+</body>
+</html>

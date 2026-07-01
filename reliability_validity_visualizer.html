@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reliability vs. Validity — CSD 525</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#1a1a1a;background:#f9f9f7;padding:20px;max-width:840px;margin:0 auto}
+h1{font-size:18px;font-weight:600;margin-bottom:3px}
+.sub{font-size:13px;color:#666;margin-bottom:14px}
+.ctx{font-size:12px;color:#555;background:#f0f0ee;border-left:3px solid #185FA5;padding:8px 12px;margin-bottom:18px;border-radius:0 4px 4px 0;line-height:1.5}
+
+/* ── Axis layout ── */
+.axis-outer{display:grid;grid-template-columns:28px 1fr;gap:0 6px;margin-bottom:4px}
+.axis-row{display:flex;flex-direction:column;justify-content:space-around;align-items:center;padding:28px 0 0}
+.axis-row span{font-size:11px;font-weight:600;color:#666;writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.04em;white-space:nowrap}
+.axis-right{display:flex;flex-direction:column;gap:6px}
+.axis-col{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:2px}
+.axis-col span{font-size:11px;font-weight:600;color:#666;text-align:center;letter-spacing:.04em}
+.arrow-row{display:flex;justify-content:center;align-items:center;gap:8px;margin-bottom:6px;font-size:11px;color:#999}
+
+/* ── Target grid ── */
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.panel{border:2px solid #e0e0de;border-radius:10px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s;overflow:hidden;display:flex;flex-direction:column}
+.panel:hover{box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.panel.sel{box-shadow:0 0 0 3px rgba(24,95,165,.35)}
+.phead{padding:8px 10px 4px;display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:3px;white-space:nowrap}
+.canwrap{width:100%;aspect-ratio:1/1;position:relative}
+canvas{display:block;width:100%;height:100%}
+.pfoot{padding:6px 10px 8px;font-size:11px;color:#666;line-height:1.35;min-height:32px}
+
+/* ── Controls ── */
+.controls{display:flex;align-items:center;gap:10px;margin:12px 0}
+button{padding:6px 14px;font-size:13px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#555;cursor:pointer;transition:background .12s}
+button:hover{background:#f0f0ee}
+button.secondary{font-size:12px;padding:5px 12px}
+
+/* ── Info card ── */
+.ic{background:#fff;border:1px solid #e8e8e6;border-radius:10px;padding:14px 16px;margin-top:4px;display:none}
+.ic.show{display:block}
+.ic-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.ic-title{font-size:14px;font-weight:600}
+.ic-badges{display:flex;gap:6px;flex-wrap:wrap}
+.ic-body{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ic-sec{font-size:12px;color:#555;line-height:1.5}
+.ic-sec strong{color:#333;display:block;margin-bottom:3px;font-size:12px}
+
+/* ── Key principle ── */
+.kp{background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:12px 16px;margin-top:14px;font-size:13px;color:#444;line-height:1.6}
+.kp strong{color:#1a1a1a}
+.kp ul{margin-top:6px;padding-left:18px}
+.kp li{margin-bottom:3px;color:#555;font-size:12px}
+
+/* ── Key comparison table ── */
+.ktable{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+.ktable th{background:#f0f0ee;padding:6px 10px;text-align:left;font-weight:600;color:#444;border:1px solid #e0e0de}
+.ktable td{padding:6px 10px;border:1px solid #e0e0de;color:#555;vertical-align:top}
+.ktable tr:nth-child(even) td{background:#fafaf8}
+
+@media(max-width:520px){.ic-body{grid-template-columns:1fr}.axis-row span{font-size:10px}}
+</style>
+</head>
+<body>
+
+<h1>Reliability vs. Validity Visualizer</h1>
+<p class="sub">Rami, Manish K. (2026). Vizualizing reliability and validity in Speech-Language Pathology. — University of North Dakota</p>
+<p class="ctx"><strong>Each target</strong> represents repeated measurements of the same person or construct. The <strong>crosshair (✛)</strong> marks the true score. <strong>Reliability</strong> = how tightly shots cluster together. <strong>Validity</strong> = whether shots center on the true score. Click any panel for a clinical SLP example. Also see notes below the plots.</p>
+
+<div class="axis-outer">
+  <div class="axis-row">
+    <span>HIGH VALIDITY</span>
+    <span>LOW VALIDITY</span>
+  </div>
+  <div class="axis-right">
+    <div class="axis-col">
+      <span>← HIGH RELIABILITY</span>
+      <span>LOW RELIABILITY →</span>
+    </div>
+    <div class="tgrid" id="tgrid">
+      <!-- Panel 0: High Rel, High Val -->
+      <div class="panel sel" id="p0" onclick="selPanel(0)">
+        <div class="phead" id="ph0"></div>
+        <div class="canwrap"><canvas id="c0"></canvas></div>
+        <div class="pfoot" id="pf0"></div>
+      </div>
+      <!-- Panel 1: Low Rel, High Val -->
+      <div class="panel" id="p1" onclick="selPanel(1)">
+        <div class="phead" id="ph1"></div>
+        <div class="canwrap"><canvas id="c1"></canvas></div>
+        <div class="pfoot" id="pf1"></div>
+      </div>
+      <!-- Panel 2: High Rel, Low Val -->
+      <div class="panel" id="p2" onclick="selPanel(2)">
+        <div class="phead" id="ph2"></div>
+        <div class="canwrap"><canvas id="c2"></canvas></div>
+        <div class="pfoot" id="pf2"></div>
+      </div>
+      <!-- Panel 3: Low Rel, Low Val -->
+      <div class="panel" id="p3" onclick="selPanel(3)">
+        <div class="phead" id="ph3"></div>
+        <div class="canwrap"><canvas id="c3"></canvas></div>
+        <div class="pfoot" id="pf3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button onclick="reshuffle()">↺ &nbsp;New random samples</button>
+  <span style="font-size:12px;color:#888">Click any target to see the SLP clinical example</span>
+</div>
+
+<!-- Info card -->
+<div class="ic" id="ic">
+  <div class="ic-top">
+    <span class="ic-title" id="ic-title"></span>
+    <div class="ic-badges" id="ic-badges"></div>
+  </div>
+  <div class="ic-body">
+    <div class="ic-sec"><strong>SLP clinical example</strong><span id="ic-slp"></span></div>
+    <div class="ic-sec"><strong>Clinical and research implication</strong><span id="ic-impl"></span></div>
+  </div>
+</div>
+
+<!-- Key principle -->
+<div class="kp">
+  <strong>Key relationship between reliability and validity</strong>
+  <ul>
+    <li>Reliability is <em>necessary but not sufficient</em> for validity. You can be reliably wrong.</li>
+    <li>You cannot be consistently valid without being reliable — a scattered instrument cannot hit the target on average.</li>
+    <li>ASHA evidence-based practice (CAA standard IV-F) requires evidence of <em>both</em> for any measure used in clinical decision-making.</li>
+  </ul>
+  <table class="ktable" style="margin-top:10px">
+    <tr><th>Quadrant</th><th>Reliability</th><th>Validity</th><th>Clinical use</th></tr>
+    <tr><td>✓ Rel / ✓ Val</td><td>High</td><td>High</td><td>Appropriate — use with confidence</td></tr>
+    <tr><td>✓ Rel / ✗ Val</td><td>High</td><td>Low</td><td>Inappropriate — measures the wrong construct</td></tr>
+    <tr><td>✗ Rel / ✓ Val</td><td>Low</td><td>High</td><td>Unreliable — right target, too much error</td></tr>
+    <tr><td>✗ Rel / ✗ Val</td><td>Low</td><td>Low</td><td>Unacceptable for clinical decisions</td></tr>
+  </table>
+</div>
+
+<script>
+/* ── PRNG ───────────────────────────────────────────────── */
+function mkRng(s){let ss=s>>>0;return()=>{ss=Math.imul(1664525,ss)+1013904223>>>0;return ss/4294967296}}
+function bm(r){const u1=r()+1e-10,u2=r();return[Math.sqrt(-2*Math.log(u1))*Math.cos(2*Math.PI*u2),Math.sqrt(-2*Math.log(u1))*Math.sin(2*Math.PI*u2)]}
+
+/* ── Panel definitions ──────────────────────────────────── */
+const PDATA=[
+  {
+    relHigh:true, valHigh:true, cx:0, cy:0, sd:12,
+    relLbl:'✓ High reliability', valLbl:'✓ High validity',
+    relCol:'#27500A', valCol:'#27500A', borderCol:'#27500A',
+    foot:'Tight cluster at the true score — consistent and accurate',
+    title:'Reliable and valid — the measurement ideal',
+    slp:'GFTA-3 administered by a trained SLP following standardized protocol: scores are consistent across sessions and examiners (reliable), and the test genuinely measures phonological accuracy — the construct of interest (valid).',
+    impl:'Both sources of error are controlled. Results support diagnosis, treatment planning, and progress monitoring. This is the evidence standard required by ASHA\'s CAA accreditation framework.'
+  },
+  {
+    relHigh:false, valHigh:true, cx:0, cy:0, sd:40,
+    relLbl:'✗ Low reliability', valLbl:'✓ High validity',
+    relCol:'#791F1F', valCol:'#27500A', borderCol:'#854F0B',
+    foot:'Scattered around the true score — right target, inconsistent aim',
+    title:'Valid but unreliable — right construct, high variability',
+    slp:'CAPE-V voice severity ratings without inter-rater calibration: multiple clinicians are assessing the right construct (voice quality) but individual ratings scatter widely because raters have not been calibrated to a shared standard.',
+    impl:'Cannot reliably detect change or compare results across clinicians. Random measurement error exceeds the signal. Intensive rater calibration sessions are required before CAPE-V can be used for clinical or research decisions.'
+  },
+  {
+    relHigh:true, valHigh:false, cx:35, cy:28, sd:12,
+    relLbl:'✓ High reliability', valLbl:'✗ Low validity',
+    relCol:'#27500A', valCol:'#791F1F', borderCol:'#A32D2D',
+    foot:'Tight cluster away from the true score — consistently wrong',
+    title:'Reliable but not valid — consistently measuring the wrong thing',
+    slp:'Using mean length of utterance (MLU) to screen for phonological awareness: MLU is highly consistent across administrations (reliable), but it measures syntactic complexity — not phonological processing — so it cannot answer the phonological awareness question.',
+    impl:'A measure can have outstanding reliability coefficients and still be entirely invalid for a given clinical question. ASHA IV-F requires construct validity evidence specific to the population and purpose — high reliability alone is not sufficient.'
+  },
+  {
+    relHigh:false, valHigh:false, cx:35, cy:28, sd:40,
+    relLbl:'✗ Low reliability', valLbl:'✗ Low validity',
+    relCol:'#791F1F', valCol:'#791F1F', borderCol:'#791F1F',
+    foot:'Scattered and off-center — neither consistent nor accurate',
+    title:'Neither reliable nor valid — not suitable for clinical use',
+    slp:'An informal, unstandardized observation checklist with no defined scoring criteria, no examiner training protocol, and no published reliability or validity data: scoring varies across administrations and the constructs being measured are undefined.',
+    impl:'Results cannot be interpreted, compared, or used for clinical decisions. ASHA evidence-based practice standards (CAA IV-F) require documented reliability AND validity evidence for any tool used to diagnose, place, or monitor a client\'s progress.'
+  }
+];
+
+let seed=42,selIdx=0;
+const CANVASES=[0,1,2,3].map(i=>document.getElementById('c'+i));
+
+/* Animation state */
+let curDots=[[],[],[],[]],tgtDots=[[],[],[],[]];
+let animing=false,animT0=null;
+const ADUR=500;
+
+/* ── Dot generation ─────────────────────────────────────── */
+function genDots(pidx,s){
+  const p=PDATA[pidx];
+  const rng=mkRng(s*97+pidx*31+7);
+  const N=14;
+  const dots=[];
+  for(let i=0;i<N;i++){
+    const[z1,z2]=bm(rng);
+    dots.push({x:p.cx+z1*p.sd, y:p.cy+z2*p.sd});
+  }
+  return dots;
+}
+
+/* ── Drawing ────────────────────────────────────────────── */
+function drawPanel(idx,dots){
+  const canvas=CANVASES[idx];
+  const DP=canvas._dp||1;
+  const W=canvas.width,H=canvas.height;
+  const W2=W/DP,H2=H/DP;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.save();ctx.scale(DP,DP);
+
+  const cx=W2/2,cy=H2/2;
+  const maxR=Math.min(W2,H2)*0.44;
+  const SC=maxR/75; // abstract→pixel scale
+
+  /* Target rings (outside→inside) */
+  const rings=[
+    {r:maxR,    fill:'#f0ede8'},
+    {r:maxR*.80,fill:'#dde6ee'},
+    {r:maxR*.60,fill:'#8ab5cc'},
+    {r:maxR*.40,fill:'#3d7d9a'},
+    {r:maxR*.20,fill:'#0F6E56'}
+  ];
+  rings.forEach(({r,fill})=>{
+    ctx.fillStyle=fill;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+  });
+  /* Ring borders */
+  rings.forEach(({r})=>{
+    ctx.strokeStyle='rgba(255,255,255,0.45)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+  });
+
+  /* Crosshair at true score center */
+  const ch=maxR*.13;
+  ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-ch,cy);ctx.lineTo(cx+ch,cy);
+  ctx.moveTo(cx,cy-ch);ctx.lineTo(cx,cy+ch);ctx.stroke();
+  /* Small dot at center */
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.beginPath();ctx.arc(cx,cy,2.5,0,Math.PI*2);ctx.fill();
+
+  /* Dots */
+  dots.forEach(d=>{
+    const dx=cx+d.x*SC, dy=cy+d.y*SC;
+    const inBounds=Math.abs(dx-cx)<W2*.55&&Math.abs(dy-cy)<H2*.55;
+    if(!inBounds)return;
+    ctx.fillStyle='#1a1030';
+    ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.arc(dx,dy,5,0,Math.PI*2);ctx.fill();ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+function drawAll(dots){
+  dots=dots||curDots;
+  [0,1,2,3].forEach(i=>drawPanel(i,dots[i]));
+}
+
+/* ── Animation ──────────────────────────────────────────── */
+function reshuffle(){
+  tgtDots=[0,1,2,3].map(i=>genDots(i,++seed));
+  animT0=performance.now();animing=true;
+  requestAnimationFrame(animStep);
+}
+
+function easeInOut(t){return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2}
+
+function animStep(now){
+  const t=Math.min((now-animT0)/ADUR,1);
+  const e=easeInOut(t);
+  const interp=[0,1,2,3].map(pi=>{
+    return curDots[pi].map((d,i)=>({
+      x:d.x+(tgtDots[pi][i].x-d.x)*e,
+      y:d.y+(tgtDots[pi][i].y-d.y)*e
+    }));
+  });
+  drawAll(interp);
+  if(t<1){requestAnimationFrame(animStep)}
+  else{curDots=tgtDots.map(arr=>[...arr]);animing=false;drawAll()}
+}
+
+/* ── Panel UI ───────────────────────────────────────────── */
+function selPanel(idx){
+  selIdx=idx;
+  [0,1,2,3].forEach(i=>{
+    document.getElementById('p'+i).classList.toggle('sel',i===idx);
+    const p=PDATA[i];
+    document.getElementById('p'+i).style.borderColor=i===idx?p.borderCol:'#e0e0de';
+  });
+  updateIC();
+}
+
+function updateIC(){
+  const p=PDATA[selIdx];
+  const ic=document.getElementById('ic');
+  ic.classList.add('show');
+  document.getElementById('ic-title').textContent=p.title;
+  const badges=document.getElementById('ic-badges');
+  badges.innerHTML=`
+    <span class="badge" style="background:${p.relCol}20;color:${p.relCol};border:1px solid ${p.relCol}50">${p.relLbl}</span>
+    <span class="badge" style="background:${p.valCol}20;color:${p.valCol};border:1px solid ${p.valCol}50">${p.valLbl}</span>`;
+  document.getElementById('ic-slp').textContent=p.slp;
+  document.getElementById('ic-impl').textContent=p.impl;
+}
+
+/* ── Panel headers & footers ────────────────────────────── */
+function buildHeaders(){
+  PDATA.forEach((p,i)=>{
+    const head=document.getElementById('ph'+i);
+    head.innerHTML=`
+      <span class="badge" style="background:${p.relCol}18;color:${p.relCol};border:1px solid ${p.relCol}45">${p.relLbl}</span>
+      <span class="badge" style="background:${p.valCol}18;color:${p.valCol};border:1px solid ${p.valCol}45">${p.valLbl}</span>`;
+    document.getElementById('pf'+i).textContent=p.foot;
+    document.getElementById('p'+i).style.borderColor=i===selIdx?p.borderCol:'#e0e0de';
+  });
+}
+
+/* ── Resize ─────────────────────────────────────────────── */
+function resizeAll(){
+  const DP=Math.min(window.devicePixelRatio||1,2);
+  CANVASES.forEach(c=>{
+    const r=c.getBoundingClientRect();
+    c.width=Math.round(r.width*DP);
+    c.height=Math.round(r.height*DP);
+    c._dp=DP;
+  });
+  drawAll();
+}
+
+/* ── Init ───────────────────────────────────────────────── */
+buildHeaders();
+curDots=[0,1,2,3].map(i=>genDots(i,seed));
+new ResizeObserver(resizeAll).observe(document.getElementById('tgrid'));
+resizeAll();
+selPanel(0);
+</script>
+</body>
+</html>
