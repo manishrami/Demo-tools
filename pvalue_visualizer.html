@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>p-value Visualizer — CSD 525</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#1a1a1a;background:#f9f9f7;padding:20px;max-width:860px;margin:0 auto}
+h1{font-size:18px;font-weight:600;margin-bottom:3px}
+.sub{font-size:13px;color:#666;margin-bottom:14px}
+.ctx{font-size:12px;color:#555;background:#f0f0ee;border-left:3px solid #A32D2D;padding:8px 12px;margin-bottom:14px;border-radius:0 4px 4px 0;line-height:1.5}
+.ctrl-grid{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:8px 14px;margin-bottom:10px}
+.ctrl-lbl{font-size:12px;color:#666;white-space:nowrap;padding-top:6px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+button{padding:5px 12px;font-size:13px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#555;cursor:pointer;transition:background .12s}
+button:hover{background:#f0f0ee}
+button.on{background:#e8f0fb;color:#1a4fa0;border-color:#1a4fa0;font-weight:500}
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+input[type=range]{flex:1;accent-color:#222}
+.tsval{font-size:22px;font-weight:600;color:#1a1a1a;min-width:60px;text-align:right}
+.example{font-size:12px;color:#777;min-height:18px;margin-bottom:10px;padding:0 2px}
+#cw{width:100%;aspect-ratio:5/2;min-height:200px;background:#fff;border:1px solid #e0e0de;border-radius:8px;overflow:hidden;margin-bottom:12px}
+canvas{display:block;width:100%;height:100%}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:12px}
+.card{background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:11px 14px;transition:border-color .2s}
+.cv{font-size:21px;font-weight:600;line-height:1.2}
+.cl{font-size:11px;color:#888;margin-top:3px}
+.cs{font-size:11px;margin-top:2px}
+.interp{font-size:13px;color:#444;line-height:1.6;background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:12px 14px;margin-bottom:12px;min-height:48px}
+.tnote{font-size:12px;color:#666;padding:4px 2px;display:none;line-height:1.4}
+.misbox{background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px 20px}
+.mislbl{font-size:12px;font-weight:600;margin-bottom:7px}
+.misitem{font-size:12px;color:#555;margin-bottom:5px;display:flex;gap:7px;line-height:1.4}
+.mismark{flex-shrink:0;font-size:13px;line-height:1.4}
+@media(max-width:560px){.misbox{grid-template-columns:1fr}.ctrl-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<h1><i>p</i>-value Visualizer</h1>
+<p class="sub">Rami, Manish K. (2026). <i>p</i>-value visualizer. University of North Dakota.</p>
+<p class="ctx"><strong>Key idea:</strong> The <i>p</i>-value is the <em>area of the red shaded tail</em> — the probability of observing a test statistic this extreme or more extreme, assuming H₀ is true. Drag the vertical line on the chart, or use the slider below it. Read the note below the plot.</p>
+
+<div class="ctrl-grid">
+  <span class="ctrl-lbl">Distribution</span>
+  <div>
+    <div class="btn-group">
+      <button id="dz" onclick="setDist('z')"><i>z</i>  (σ known)</button>
+      <button id="dt" onclick="setDist('t')"><i>t</i>  (σ estimated from sample)</button>
+    </div>
+    <p id="tnote" class="tnote">The <i>t</i>-distribution has heavier tails than <i>z</i>, reflecting extra uncertainty when σ is estimated from the sample. As <i>df</i> → ∞, <i>t</i> → <i>z</i>.</p>
+  </div>
+
+  <span class="ctrl-lbl" id="dflbl" style="display:none">Degrees of freedom</span>
+  <div class="btn-group" id="dfrow" style="display:none">
+    <button id="df5"  onclick="setDF(5)"><i>df</i> = 5</button>
+    <button id="df10" onclick="setDF(10)"><i>df</i> = 10</button>
+    <button id="df20" onclick="setDF(20)"><i>df</i> = 20</button>
+    <button id="df30" onclick="setDF(30)"><i>df</i> = 30</button>
+  </div>
+
+  <span class="ctrl-lbl">Tails</span>
+  <div class="btn-group">
+    <button id="tail2" onclick="setTails(true)">Two-tailed &nbsp;(H₁: μ ≠ μ₀)</button>
+    <button id="tail1" onclick="setTails(false)">One-tailed &nbsp;(H₁: μ &gt; μ₀)</button>
+  </div>
+
+  <span class="ctrl-lbl">Alpha (α)</span>
+  <div class="btn-group">
+    <button id="a1"  onclick="setAlpha(0.01)">α = 0.01</button>
+    <button id="a5"  onclick="setAlpha(0.05)">α = 0.05</button>
+    <button id="a10" onclick="setAlpha(0.10)">α = 0.10</button>
+  </div>
+</div>
+
+<div class="slider-row">
+  <span style="font-size:12px;color:#666;min-width:62px">Test stat.</span>
+  <input type="range" id="tssl" min="-4" max="4" value="1.96" step="0.05">
+  <span class="tsval" id="tsval">+1.96</span>
+</div>
+<p class="example" id="example"></p>
+
+<div id="cw">
+  <canvas id="mc" role="img" aria-label="Sampling distribution under the null hypothesis. The red shaded tail shows the p-value region."></canvas>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="cv" id="tscard" style="color:#1a1a1a">+1.96</div>
+    <div class="cl" id="distlbl">Test statistic (z)</div>
+    <div class="cs" id="tscs" style="color:#888"></div>
+  </div>
+  <div class="card">
+    <div class="cv" id="pvcard" style="color:#A32D2D">0.050</div>
+    <div class="cl"><i>p</i>-value</div>
+    <div class="cs" id="pvlbl" style="color:#888">borderline</div>
+  </div>
+  <div class="card">
+    <div class="cv" id="cvcard" style="color:#555">±1.960</div>
+    <div class="cl">Critical value</div>
+    <div class="cs" id="alphacs" style="color:#888">α = 0.05, two-tailed</div>
+  </div>
+  <div class="card" id="decwrap">
+    <div class="cv" id="deccard" style="color:#888">—</div>
+    <div class="cl">Decision</div>
+    <div class="cs" id="deccs" style="color:#888"></div>
+  </div>
+</div>
+
+<div class="interp" id="interp"></div>
+
+<div class="misbox">
+  <div>
+    <div class="mislbl" style="color:#27500A">✓ What <i>p</i> actually means</div>
+    <div class="misitem"><span class="mismark" style="color:#27500A">✓</span><span>The probability of observing data <em>this extreme or more</em> if H₀ were true — the red tail area above</span></div>
+    <div class="misitem"><span class="mismark" style="color:#27500A">✓</span><span>A long-run frequency: if H₀ is true and we repeated the study many times, <i>p</i> × 100% of samples would produce a test statistic at least this extreme</span></div>
+    <div class="misitem"><span class="mismark" style="color:#27500A">✓</span><span>A statement about the data given H₀, written P(data | H₀)</span></div>
+  </div>
+  <div>
+    <div class="mislbl" style="color:#791F1F">✗ What <i>p</i> does NOT mean</div>
+    <div class="misitem"><span class="mismark" style="color:#791F1F">✗</span><span>The probability that H₀ is true — P(H₀ | data) requires a prior (Bayesian framework)</span></div>
+    <div class="misitem"><span class="mismark" style="color:#791F1F">✗</span><span>The probability that the result is "due to chance"</span></div>
+    <div class="misitem"><span class="mismark" style="color:#791F1F">✗</span><span>A measure of effect size or clinical importance — a large n can make a trivial effect "significant"</span></div>
+    <div class="misitem"><span class="mismark" style="color:#791F1F">✗</span><span>A meaningful divide: <i>p</i> = 0.049 and <i>p</i> = 0.051 are essentially identical</span></div>
+  </div>
+</div>
+
+<script>
+/* ── Math helpers ─────────────────────────────────────── */
+function npdf(x){return Math.exp(-0.5*x*x)/2.5066282746}
+function ncdf(x){
+  // Standard normal CDF via the Abramowitz & Stegun 7.1.26 erf approximation.
+  // erf() takes x/sqrt(2) as its argument -- the previous version passed x directly,
+  // which silently computed Phi(x*sqrt(2)) instead of Phi(x) (e.g. ncdf(1.96) came out
+  // to .997 instead of .975). That threw off every z-based p-value, critical value,
+  // and tail probability in this file.
+  const a=[0.254829592,-0.284496736,1.421413741,-1.453152027,1.061405429],p=0.3275911;
+  const s=x<0?-1:1,ax=Math.abs(x)/Math.SQRT2,t2=1/(1+p*ax);
+  return 0.5*(1+s*(1-((((a[4]*t2+a[3])*t2+a[2])*t2+a[1])*t2+a[0])*t2*Math.exp(-ax*ax)));
+}
+function nInv(p){
+  if(p<=0)return-8;if(p>=1)return 8;
+  let lo=-8,hi=8;
+  for(let i=0;i<64;i++){const m=(lo+hi)/2;ncdf(m)<p?lo=m:hi=m}
+  return(lo+hi)/2;
+}
+
+/* Draws a centered line of canvas text where some segments are italic
+   (used for statistical symbols like z/t per APA style) and some are not. */
+function fillMixed(parts,cx,y,baseFont,col){
+  const prevAlign=ct.textAlign;
+  ct.textAlign='left';
+  const widths=parts.map(p=>{ct.font=(p.italic?'italic ':'')+baseFont;return ct.measureText(p.txt).width});
+  const total=widths.reduce((a,b)=>a+b,0);
+  let x=cx-total/2;
+  ct.fillStyle=col;
+  parts.forEach((p,i)=>{ct.font=(p.italic?'italic ':'')+baseFont;ct.fillText(p.txt,x,y);x+=widths[i]});
+  ct.textAlign=prevAlign;
+}
+
+/* t-distribution: proportional PDF and numerical tail probability */
+function tprop(x,df){return Math.pow(1+x*x/df,-(df+1)/2)}
+
+function tTailP(absT,df){
+  /* Returns P(T > absT) for t-distribution with df degrees of freedom.
+     Uses trapezoid integration: tail / fullHalf * 0.5 */
+  const N=1500,h=15/N;
+  let full=0,tail=0;
+  for(let i=0;i<=N;i++){
+    const x=i*h,w=(i===0||i===N)?0.5:1,v=w*tprop(x,df);
+    full+=v;
+    if(x>=absT)tail+=v;
+  }
+  return(tail/full)*0.5;
+}
+
+function tCrit(targetP,df){
+  /* Find t such that P(T > t) = targetP via bisection */
+  let lo=0,hi=12;
+  for(let i=0;i<64;i++){const m=(lo+hi)/2;tTailP(m,df)>targetP?lo=m:hi=m}
+  return(lo+hi)/2;
+}
+
+/* ── State ────────────────────────────────────────────── */
+let ts=1.96, twoTail=true, alpha=0.05, dist='z', df=20;
+let W=680, H=280, DP=1, dragging=false, dLayout=null;
+
+const cv=document.getElementById('mc');
+const ct=cv.getContext('2d');
+
+function pdfAt(x){return dist==='z'?npdf(x):tprop(x,df)}
+
+function getPV(){
+  const a=Math.abs(ts);
+  if(twoTail){
+    const p1=dist==='z'?(1-ncdf(a)):tTailP(a,df);
+    return Math.min(1,2*p1);
+  }
+  // One-tailed test is fixed as H1: mu > mu0 (right tail), so p = P(T >= ts)
+  // regardless of the sign of ts -- dragging the statistic left of zero should
+  // correctly show a large (non-significant) p-value, not flip to the left tail.
+  if(dist==='z')return 1-ncdf(ts);
+  return ts>=0?tTailP(ts,df):1-tTailP(-ts,df);
+}
+
+function getCritVal(){
+  const target=twoTail?alpha/2:alpha;
+  return dist==='z'?nInv(1-target):tCrit(target,df);
+}
+
+/* ── Drawing ──────────────────────────────────────────── */
+function draw(){
+  ct.clearRect(0,0,W*DP,H*DP);
+  ct.save();ct.scale(DP,DP);
+
+  const XL=-4.5,XR=4.5,PL=16,PR=16,PT=50,PB=50;
+  const pw=W-PL-PR,ph=H-PT-PB;
+  const NP=500,dxP=(XR-XL)/NP;
+  const xs=Array.from({length:NP+1},(_,i)=>XL+i*dxP);
+  function xm(v){return PL+(v-XL)/(XR-XL)*pw}
+  const mpdf=pdfAt(0);
+  function ym(v){return PT+ph-(v/mpdf)*ph*0.82}
+  const pdfs=xs.map(x=>pdfAt(x));
+
+  dLayout={XL,XR,PL,pw};
+
+  /* 1 · Full distribution (light fill) */
+  ct.beginPath();ct.moveTo(xm(XL),ym(0));
+  xs.forEach((x,i)=>ct.lineTo(xm(x),ym(pdfs[i])));
+  ct.lineTo(xm(XR),ym(0));ct.closePath();
+  ct.fillStyle='rgba(24,95,165,0.07)';ct.fill();
+
+  /* 2 · Red tail(s) = p-value region */
+  const aTS=Math.abs(ts);
+  function shadeTail(lo,hi){
+    ct.beginPath();ct.moveTo(xm(lo),ym(0));
+    xs.forEach((x,i)=>{if(x>=lo&&x<=hi)ct.lineTo(xm(x),ym(pdfs[i]))});
+    ct.lineTo(xm(hi),ym(0));ct.closePath();
+    ct.fillStyle='rgba(163,45,45,0.38)';ct.fill();
+  }
+  if(twoTail){shadeTail(XL,-aTS);shadeTail(aTS,XR)}
+  else{shadeTail(ts,XR)}
+
+  /* 3 · Distribution outline */
+  ct.strokeStyle='#185FA5';ct.lineWidth=2;ct.beginPath();
+  xs.forEach((x,i)=>i===0?ct.moveTo(xm(x),ym(pdfs[i])):ct.lineTo(xm(x),ym(pdfs[i])));
+  ct.stroke();
+
+  /* 4 · Critical value line(s) */
+  const cv2=getCritVal();
+  const dLbl=dist==='z'?'z':'t';
+  ct.setLineDash([5,4]);ct.strokeStyle='rgba(80,80,80,0.35)';ct.lineWidth=1;
+  ct.fillStyle='#888';ct.font='10px sans-serif';ct.textAlign='center';ct.textBaseline='top';
+  function drawCV(v){
+    const xx=xm(v);
+    ct.beginPath();ct.moveTo(xx,PT);ct.lineTo(xx,PT+ph);ct.stroke();
+    fillMixed([{txt:dLbl,italic:true},{txt:'_c = '+(v>=0?'+':'')+v.toFixed(2),italic:false}],xx,PT+ph+22,'10px sans-serif','#888');
+  }
+  if(twoTail){drawCV(cv2);drawCV(-cv2)}
+  else{drawCV(cv2)}
+  ct.setLineDash([]);
+
+  /* 5 · H₀ centre label */
+  ct.fillStyle='rgba(80,80,80,0.38)';ct.font='10px sans-serif';
+  ct.textAlign='center';ct.textBaseline='bottom';
+  ct.fillText('H₀  (μ = μ₀)',xm(0),PT+ph-4);
+
+  /* 6 · Test statistic line + drag handle */
+  const xx=xm(ts);
+  ct.strokeStyle='#111';ct.lineWidth=2;
+  ct.beginPath();ct.moveTo(xx,PT-20);ct.lineTo(xx,PT+ph);ct.stroke();
+  ct.fillStyle='rgba(30,30,30,0.15)';ct.strokeStyle='rgba(30,30,30,0.42)';ct.lineWidth=0.75;
+  ct.fillRect(xx-13,PT-21,26,14);ct.strokeRect(xx-13,PT-21,26,14);
+  ct.fillStyle='rgba(30,30,30,0.58)';
+  [-5,0,5].forEach(dx=>{ct.beginPath();ct.arc(xx+dx,PT-14,1.5,0,Math.PI*2);ct.fill()});
+
+  /* 7 · X-axis */
+  ct.strokeStyle='#ccc';ct.lineWidth=1;
+  ct.beginPath();ct.moveTo(PL,PT+ph);ct.lineTo(PL+pw,PT+ph);ct.stroke();
+  ct.fillStyle='#555';ct.font='11px sans-serif';
+  for(let v=-4;v<=4;v++){
+    const x2=xm(v);
+    ct.strokeStyle='#ccc';ct.lineWidth=0.75;ct.beginPath();ct.moveTo(x2,PT+ph);ct.lineTo(x2,PT+ph+4);ct.stroke();
+    ct.textAlign='center';ct.textBaseline='top';ct.fillText(v,x2,PT+ph+6);
+  }
+  ct.font='12px sans-serif';ct.textAlign='center';ct.textBaseline='top';
+  fillMixed([{txt:dLbl,italic:true},{txt:'-statistic  (standard errors from H₀)',italic:false}],PL+pw/2,PT+ph+22,'12px sans-serif','#555');
+
+  ct.restore();
+  updateStats();
+}
+
+/* ── DOM updates ──────────────────────────────────────── */
+function fmt(pv){return pv<0.001?'< 0.001':pv.toFixed(3)}
+
+function updateStats(){
+  const pv=getPV(), cv2=getCritVal(), reject=pv<alpha;
+  const dLbl=dist==='z'?'z':'t';
+  const tsStr=(ts>=0?'+':'')+ts.toFixed(2);
+  const alphaStr=alpha.toFixed(2);
+  // "Beyond critical region" uses the same strict comparison as the reject decision
+  // (pv < alpha) so the two indicators never contradict each other at the boundary.
+  const beyond=twoTail?Math.abs(ts)>cv2:ts>cv2;
+
+  /* Test stat card */
+  document.getElementById('tscard').textContent=tsStr;
+  document.getElementById('distlbl').innerHTML='Test statistic (<i>'+dLbl+'</i>)';
+  document.getElementById('tscs').textContent=
+    beyond?'beyond critical region':'within critical region';
+  document.getElementById('tscs').style.color=beyond?'#A32D2D':'#888';
+
+  /* p-value card */
+  const pvStr=fmt(pv);
+  const pvCol=pv<0.001?'#5c0f0f':pv<0.01?'#791F1F':pv<0.05?'#A32D2D':pv<0.10?'#854F0B':'#888';
+  document.getElementById('pvcard').textContent=pvStr;
+  document.getElementById('pvcard').style.color=pvCol;
+  const pvLbl=pv<0.001?'very highly significant':pv<0.01?'significant at α=.01':
+              pv<0.05?'significant at α=.05':pv<0.10?'marginal (α=.10)':'not significant';
+  document.getElementById('pvlbl').textContent=pvLbl;
+  document.getElementById('pvlbl').style.color=pvCol;
+
+  /* Critical value card */
+  document.getElementById('cvcard').textContent=
+    (twoTail?'±':'+')+cv2.toFixed(3);
+  document.getElementById('alphacs').textContent=
+    "α = "+alphaStr+(twoTail?" (two-tailed)":" (one-tailed)");
+
+  /* Decision card */
+  const decEl=document.getElementById('deccard');
+  const decWrap=document.getElementById('decwrap');
+  if(reject){
+    decEl.textContent='Reject H₀';decEl.style.color='#27500A';
+    decWrap.style.borderColor='#27500A';
+    document.getElementById('deccs').innerHTML='<i>p</i>('+pvStr+') &lt; α('+alphaStr+')';
+    document.getElementById('deccs').style.color='#27500A';
+  } else {
+    decEl.textContent='Fail to reject H₀';decEl.style.color='#888';
+    decWrap.style.borderColor='#e8e8e6';
+    document.getElementById('deccs').innerHTML='<i>p</i>('+pvStr+') ≥ α('+alphaStr+')';
+    document.getElementById('deccs').style.color='#888';
+  }
+
+  /* Interpretation paragraph */
+  const pct=pv<0.001?'< 0.1':(pv*100).toFixed(1);
+  document.getElementById('interp').innerHTML=
+    "<i>p</i> = "+pvStr+": If H₀ is true, there is a "+pct+"% probability of observing a <i>"+dLbl+
+    "</i>-statistic at least as extreme as <i>"+dLbl+"</i> = "+tsStr+". Since <i>p</i> ("+pvStr+") "+
+    (reject?"< ":" ≥ ")+"α ("+alphaStr+"), we "+(reject?"reject":"fail to reject")+" H₀.";
+
+  /* Slider value display */
+  document.getElementById('tssl').value=ts;
+  document.getElementById('tsval').textContent=tsStr;
+
+  /* Dynamic clinical example */
+  // gm/se are shown to extra precision so the printed formula actually multiplies
+  // out to the displayed test statistic (fewer decimals left a visible rounding gap).
+  const n=dist==='z'?20:df+1;
+  const se=15/Math.sqrt(n);
+  const gm=100+ts*se;
+  document.getElementById('example').innerHTML=
+    "Clinical example (CELF-5, <i>n</i> = "+n+"): group mean = "+gm.toFixed(2)+
+    ", normative mean = 100, <i>SE</i> = "+se.toFixed(3)+
+    ".  <i>"+dLbl+"</i> = ("+gm.toFixed(2)+" − 100) / "+se.toFixed(3)+" = "+tsStr+".";
+}
+
+/* ── Control handlers ─────────────────────────────────── */
+function setDist(v){dist=v;syncBtns();draw()}
+function setDF(v){df=v;syncBtns();draw()}
+function setTails(v){twoTail=v;syncBtns();draw()}
+function setAlpha(v){alpha=v;syncBtns();draw()}
+
+function syncBtns(){
+  ['z','t'].forEach(d=>document.getElementById('d'+d).classList.toggle('on',d===dist));
+  [5,10,20,30].forEach(v=>document.getElementById('df'+v).classList.toggle('on',v===df));
+  document.getElementById('tail2').classList.toggle('on',twoTail);
+  document.getElementById('tail1').classList.toggle('on',!twoTail);
+  [1,5,10].forEach(a=>document.getElementById('a'+a).classList.toggle('on',Math.round(alpha*100)===a));
+  const showT=dist==='t';
+  document.getElementById('dfrow').style.display=showT?'flex':'none';
+  document.getElementById('dflbl').style.display=showT?'block':'none';
+  document.getElementById('tnote').style.display=showT?'block':'none';
+}
+
+document.getElementById('tssl').addEventListener('input',e=>{ts=+e.target.value;draw()});
+
+/* ── Drag interaction ─────────────────────────────────── */
+function mxOf(e){const r=cv.getBoundingClientRect();return(e.clientX-r.left)*W/r.width}
+function txOf(e){const r=cv.getBoundingClientRect();return(e.touches[0].clientX-r.left)*W/r.width}
+function tsPx(){if(!dLayout)return-999;const{XL,XR,PL,pw}=dLayout;return PL+(ts-XL)/(XR-XL)*pw}
+function tsFromMx(mx){
+  const{XL,XR,PL,pw}=dLayout;
+  return Math.min(4,Math.max(-4,parseFloat((XL+(mx-PL)/pw*(XR-XL)).toFixed(2))));
+}
+
+cv.addEventListener('mousemove',e=>{
+  if(!dLayout)return;
+  const mx=mxOf(e);
+  if(dragging){ts=tsFromMx(mx);draw()}
+  else cv.style.cursor=Math.abs(mx-tsPx())<15?'ew-resize':'default';
+});
+cv.addEventListener('mousedown',e=>{
+  if(dLayout&&Math.abs(mxOf(e)-tsPx())<18){dragging=true;e.preventDefault()}
+});
+document.addEventListener('mouseup',()=>{dragging=false});
+cv.addEventListener('touchstart',e=>{
+  if(dLayout&&Math.abs(txOf(e)-tsPx())<22){dragging=true;e.preventDefault()}
+},{passive:false});
+cv.addEventListener('touchmove',e=>{
+  if(!dragging)return;ts=tsFromMx(txOf(e));draw();e.preventDefault();
+},{passive:false});
+cv.addEventListener('touchend',()=>{dragging=false});
+
+/* ── Resize ───────────────────────────────────────────── */
+function rsz(){
+  const r=document.getElementById('cw').getBoundingClientRect();
+  DP=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;
+  cv.width=Math.round(W*DP);cv.height=Math.round(H*DP);draw();
+}
+new ResizeObserver(rsz).observe(document.getElementById('cw'));
+syncBtns();rsz();
+</script>
+</body>
+</html>
