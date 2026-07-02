@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Effect Size &amp; Distributional Overlap — CSD 525</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;color:#1a1a1a;background:#f9f9f7;padding:20px;max-width:860px;margin:0 auto}
+h1{font-size:18px;font-weight:600;margin-bottom:3px}
+.sub{font-size:13px;color:#666;margin-bottom:14px}
+.ctx{font-size:12px;color:#555;background:#f0f0ee;border-left:3px solid #0F6E56;padding:8px 12px;margin-bottom:14px;border-radius:0 4px 4px 0;line-height:1.5}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.lbl{font-size:12px;color:#666;white-space:nowrap}
+button{padding:5px 13px;font-size:13px;border:1px solid #ccc;border-radius:6px;background:#fff;color:#555;cursor:pointer;transition:background .12s}
+button:hover{background:#f0f0ee}
+button.on{background:#e8f0fb;color:#1a4fa0;border-color:#1a4fa0;font-weight:500}
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+input[type=range]{flex:1;accent-color:#185FA5}
+.rval{font-size:22px;font-weight:600;color:#185FA5;min-width:54px;text-align:right}
+#cw{width:100%;aspect-ratio:5/2;min-height:200px;background:#fff;border:1px solid #e0e0de;border-radius:8px;overflow:hidden;margin-bottom:12px}
+canvas{display:block;width:100%;height:100%}
+.bar-wrap{margin-bottom:14px}
+.bar{display:flex;height:22px;border-radius:5px;overflow:hidden;margin-bottom:6px}
+.bar-seg{transition:width .25s ease;height:100%}
+.bar-lbls{display:flex;justify-content:space-between;font-size:12px;flex-wrap:wrap;gap:4px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.card{background:#fff;border:1px solid #e8e8e6;border-radius:8px;padding:11px 14px}
+.cv{font-size:22px;font-weight:600;line-height:1.2}
+.cl{font-size:11px;color:#888;margin-top:3px}
+.cs{font-size:11px;color:#aaa;margin-top:2px}
+.desc{font-size:13px;color:#555;line-height:1.55;min-height:40px;margin-bottom:12px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#555;margin-top:4px}
+.li{display:flex;align-items:center;gap:5px}
+.lsw{width:13px;height:13px;flex-shrink:0;border-radius:2px}
+@media(max-width:560px){.rval{font-size:18px}}
+</style>
+</head>
+<body>
+
+<h1>Effect Size &amp; Distributional Overlap Visualizer</h1>
+<p class="sub">Rami, Manish K. (2026) Effect Size and Distributional Overlap Visualizer. University of North Dakota.</p>
+<p class="ctx"><strong>Clinical context:</strong> Comparing a control group and a treatment group, both with standard scores (M = 100, SD = 15). Cohen's d is expressed in standard deviation units. The three shaded regions show what each group's distribution looks like and how much they overlap. Either use the preset buttons for effect sizes (SLP benchmarks) or use the slider to change the values of Cohen's d to examine the distributions. Also read the note on interpretation below the plot.</p>
+
+<div class="row">
+  <span class="lbl">SLP benchmarks:</span>
+  <button id="ps0" onclick="setD(0.20)">Small (.20)</button>
+  <button id="ps1" onclick="setD(0.50)" class="on">Medium (.50)</button>
+  <button id="ps2" onclick="setD(0.80)">Large (.80)</button>
+  <button id="ps3" onclick="setD(1.50)">Very large (1.50)</button>
+</div>
+
+<div class="slider-row">
+  <span class="lbl" style="min-width:36px">Cohen's d =</span>
+  <input type="range" id="dsl" min="0" max="3" value="0.5" step="0.05">
+  <span class="rval" id="dv2">0.50</span>
+</div>
+
+<div id="cw"><canvas id="mc" role="img" aria-label="Two overlapping normal distributions showing control and treatment groups, with a colored overlap region and Cohen's d annotation"></canvas></div>
+
+<div class="bar-wrap">
+  <div class="bar">
+    <div id="bblue" class="bar-seg" style="background:#185FA5"></div>
+    <div id="bamber" class="bar-seg" style="background:#BA7517"></div>
+    <div id="bteal" class="bar-seg" style="background:#1D9E75"></div>
+  </div>
+  <div class="bar-lbls">
+    <span id="lblblue" style="color:#0C447C;font-weight:500"></span>
+    <span id="lblamber" style="color:#633806;font-weight:500"></span>
+    <span id="lblteal" style="color:#085041;font-weight:500"></span>
+  </div>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <div class="cv" id="dcard" style="color:#185FA5">0.50</div>
+    <div class="cl">Cohen's d</div>
+    <div class="cs" id="dlbl">Medium effect</div>
+  </div>
+  <div class="card">
+    <div class="cv" id="ovlcard" style="color:#854F0B">80%</div>
+    <div class="cl">Overlap coefficient</div>
+    <div class="cs">distributional overlap</div>
+  </div>
+  <div class="card">
+    <div class="cv" id="clescard" style="color:#0F6E56">64%</div>
+    <div class="cl">Probability of superiority</div>
+    <div class="cs">P(treated &gt; random control)</div>
+  </div>
+  <div class="card">
+    <div class="cv" id="u3card" style="color:#444">69th</div>
+    <div class="cl">Control group percentile</div>
+    <div class="cs">of average treated participant</div>
+  </div>
+</div>
+
+<p class="desc" id="desc"></p>
+
+<div class="legend">
+  <span class="li"><span class="lsw" style="background:rgba(55,138,221,0.5);border:1px solid #185FA5"></span>Control only</span>
+  <span class="li"><span class="lsw" style="background:rgba(186,117,23,0.6)"></span>Distributional overlap</span>
+  <span class="li"><span class="lsw" style="background:rgba(29,158,117,0.5);border:1px solid #0F6E56"></span>Treatment only</span>
+  <span class="li"><span style="width:18px;height:1px;border-top:1.5px dashed #888;display:inline-block"></span>Group means</span>
+</div>
+
+<script>
+function npdf(x){return Math.exp(-0.5*x*x)/2.5066282746}
+function ncdf(x){
+  const a=[0.254829592,-0.284496736,1.421413741,-1.453152027,1.061405429],p=0.3275911;
+  const s=x<0?-1:1,ax=Math.abs(x),t=1/(1+p*ax);
+  return 0.5*(1+s*(1-((((a[4]*t+a[3])*t+a[2])*t+a[1])*t+a[0])*t*Math.exp(-ax*ax)));
+}
+function pdfAt(x,mu,sg){return npdf((x-mu)/sg)/sg}
+
+let d=0.50,W=680,H=280,DP=1;
+const MU=100,SIG=15;
+const cv=document.getElementById('mc');
+const ct=cv.getContext('2d');
+
+function draw(){
+  ct.clearRect(0,0,W*DP,H*DP);ct.save();ct.scale(DP,DP);
+
+  const mu1=MU+d*SIG;
+  const xMin=MU-4.4*SIG;
+  const xMax=mu1+4.4*SIG;
+  const PL=16,PR=16,PT=50,PB=52;
+  const pw=W-PL-PR,ph=H-PT-PB;
+  const NP=500,dxP=(xMax-xMin)/NP;
+  const xs=Array.from({length:NP+1},(_,i)=>xMin+i*dxP);
+  function xm(v){return PL+(v-xMin)/(xMax-xMin)*pw}
+  const mpdf=pdfAt(MU,MU,SIG);
+  function ym(v){return PT+ph-(v/mpdf)*ph*0.83}
+
+  const p0=xs.map(x=>pdfAt(x,MU,SIG));
+  const p1=xs.map(x=>pdfAt(x,mu1,SIG));
+
+  function fillPath(pts,col){
+    ct.beginPath();ct.moveTo(xm(xMin),ym(0));
+    xs.forEach((x,i)=>ct.lineTo(xm(x),ym(pts[i])));
+    ct.lineTo(xm(xMax),ym(0));ct.closePath();
+    ct.fillStyle=col;ct.fill();
+  }
+  function strokePath(pts,col){
+    ct.strokeStyle=col;ct.lineWidth=2;ct.beginPath();
+    xs.forEach((x,i)=>i===0?ct.moveTo(xm(x),ym(pts[i])):ct.lineTo(xm(x),ym(pts[i])));
+    ct.stroke();
+  }
+
+  fillPath(p0,'rgba(55,138,221,0.22)');
+  fillPath(p1,'rgba(29,158,117,0.22)');
+  fillPath(xs.map((_,i)=>Math.min(p0[i],p1[i])),'rgba(186,117,23,0.50)');
+  strokePath(p0,'#185FA5');
+  strokePath(p1,'#0F6E56');
+
+  const axC='#ccc',txC='#555';
+  ct.strokeStyle=axC;ct.lineWidth=1;
+  ct.beginPath();ct.moveTo(PL,PT+ph);ct.lineTo(PL+pw,PT+ph);ct.stroke();
+
+  const stp=20;
+  ct.fillStyle=txC;ct.font='11px sans-serif';ct.textAlign='center';ct.textBaseline='top';
+  for(let v=Math.ceil(xMin/stp)*stp;v<=xMax;v+=stp){
+    const xx=xm(v);
+    ct.strokeStyle=axC;ct.lineWidth=0.75;
+    ct.beginPath();ct.moveTo(xx,PT+ph);ct.lineTo(xx,PT+ph+4);ct.stroke();
+    ct.fillText(Math.round(v),xx,PT+ph+6);
+  }
+  ct.font='12px sans-serif';
+  ct.fillText('Standard score  (M = 100, SD = 15)',PL+pw/2,PT+ph+22);
+
+  if(d>0.05){
+    ct.strokeStyle='rgba(100,100,100,0.22)';ct.lineWidth=1;ct.setLineDash([4,3]);
+    ct.beginPath();ct.moveTo(xm(MU),PT+20);ct.lineTo(xm(MU),PT+ph);ct.stroke();
+    ct.beginPath();ct.moveTo(xm(mu1),PT+20);ct.lineTo(xm(mu1),PT+ph);ct.stroke();
+    ct.setLineDash([]);
+  }
+
+  const sep=xm(mu1)-xm(MU);
+
+  if(d>0.08&&sep>30){
+    const ay=PT+20;
+    ct.strokeStyle='#333';ct.lineWidth=1.5;
+    ct.beginPath();ct.moveTo(xm(MU)+4,ay);ct.lineTo(xm(mu1)-4,ay);ct.stroke();
+    ct.fillStyle='#333';
+    const ah=5,ab=4;
+    ct.beginPath();ct.moveTo(xm(MU),ay);ct.lineTo(xm(MU)+ah,ay-ab);ct.lineTo(xm(MU)+ah,ay+ab);ct.closePath();ct.fill();
+    ct.beginPath();ct.moveTo(xm(mu1),ay);ct.lineTo(xm(mu1)-ah,ay-ab);ct.lineTo(xm(mu1)-ah,ay+ab);ct.closePath();ct.fill();
+  }
+
+  // Single-line summary (control mean, treatment mean, Cohen's d) shown above the curves.
+  // Previously these were three separately-positioned labels that landed on top of one
+  // another near the curve peaks; they're now one row, measured and centered as a unit,
+  // with font/spacing that shrinks on narrow canvases so it never wraps or collides.
+  const narrow=pw<480;
+  ct.font=(narrow?'bold 10px sans-serif':'bold 12px sans-serif');
+  ct.textBaseline='middle';ct.textAlign='left';
+  const parts=[
+    {txt:'Control  M = '+MU,col:'#185FA5'},
+    {txt:'Treatment  M = '+Math.round(mu1),col:'#0F6E56'},
+    {txt:'d = '+d.toFixed(2)+'  ('+(d*SIG).toFixed(1)+' pts)',col:'#333'}
+  ];
+  const gap=narrow?12:22;
+  const widths=parts.map(p=>ct.measureText(p.txt).width);
+  const total=widths.reduce((a,b)=>a+b,0)+gap*(parts.length-1);
+  let tx=PL+Math.max(0,(pw-total)/2);
+  const ty=18;
+  parts.forEach((p,i)=>{ct.fillStyle=p.col;ct.fillText(p.txt,tx,ty);tx+=widths[i]+gap;});
+
+  ct.restore();
+  updateStats();
+}
+
+function updateStats(){
+  const ar=Math.abs(d);
+  const ovl=2*ncdf(-ar/2);
+  const cles=ncdf(ar/Math.sqrt(2));
+  const u3=ncdf(ar);
+  const ctlOnly=(1-ovl)/2;
+
+  document.getElementById('dv2').textContent=d.toFixed(2);
+  document.getElementById('dcard').textContent=d.toFixed(2);
+  const lbl=ar<.20?'Negligible':ar<.50?'Small':ar<.80?'Medium':ar<1.20?'Large':'Very large';
+  document.getElementById('dlbl').textContent=lbl+" effect (Cohen's convention)";
+  document.getElementById('ovlcard').textContent=(ovl*100).toFixed(0)+'%';
+  document.getElementById('clescard').textContent=(cles*100).toFixed(0)+'%';
+  document.getElementById('u3card').textContent=ordinal((u3*100).toFixed(0));
+
+  document.getElementById('bblue').style.width=(ctlOnly*100).toFixed(1)+'%';
+  document.getElementById('bamber').style.width=(ovl*100).toFixed(1)+'%';
+  document.getElementById('bteal').style.width=(ctlOnly*100).toFixed(1)+'%';
+  document.getElementById('lblblue').textContent='Control only '+( ctlOnly*100).toFixed(0)+'%';
+  document.getElementById('lblamber').textContent='Overlap '+(ovl*100).toFixed(0)+'%';
+  document.getElementById('lblteal').textContent='Treatment only '+(ctlOnly*100).toFixed(0)+'%';
+
+  document.getElementById('desc').textContent=getDesc(d);
+
+  const PVALS=[0.20,0.50,0.80,1.50];
+  PVALS.forEach((v,i)=>document.getElementById('ps'+i).classList.toggle('on',Math.abs(v-d)<.01));
+}
+
+function ordinal(n){
+  const s=['th','st','nd','rd'],v=n%100;
+  return n+(s[(v-20)%10]||s[v]||s[0]);
+}
+
+function getDesc(d){
+  const ar=Math.abs(d);
+  const u3pct=(ncdf(ar)*100).toFixed(0);
+  const ovlpct=(2*ncdf(-ar/2)*100).toFixed(0);
+  if(ar<.20) return `Negligible effect — d = ${ar.toFixed(2)}. The two distributions are nearly identical (${ovlpct}% overlap). This level is typical of test-retest measurement without any intervention, or when a treatment has essentially no clinical impact.`;
+  if(ar<.50) return `Small effect — d = ${ar.toFixed(2)}. The average treated participant scores at the ${u3pct}th percentile of the control group, with ${ovlpct}% distributional overlap. Seen in some maintenance-phase therapy outcomes or weak environmental interventions.`;
+  if(ar<.80) return `Medium effect — d = ${ar.toFixed(2)}. Cohen's medium benchmark. The average treated participant scores at the ${u3pct}th percentile of controls (${ovlpct}% overlap). Typical of well-delivered language therapy or phonological interventions in RCTs.`;
+  if(ar<1.20) return `Large effect — d = ${ar.toFixed(2)}. The average treated participant scores at the ${u3pct}th percentile of controls, with only ${ovlpct}% distributional overlap. Consistent with intensive interventions such as phonological awareness therapy (CTOPP-2 outcomes) or AAC-based communication approaches.`;
+  return `Very large effect — d = ${ar.toFixed(2)}. Only ${ovlpct}% distributional overlap; the average treated participant scores at the ${u3pct}th percentile of controls. Seen in intensive protocols such as LSVT LOUD for Parkinson's disease or highly structured behavioral treatment programs.`;
+}
+
+function setD(val){d=val;document.getElementById('dsl').value=val;draw()}
+document.getElementById('dsl').addEventListener('input',e=>{d=+e.target.value;draw()});
+
+function rsz(){
+  const r=document.getElementById('cw').getBoundingClientRect();
+  DP=Math.min(window.devicePixelRatio||1,2);W=r.width;H=r.height;
+  cv.width=Math.round(W*DP);cv.height=Math.round(H*DP);draw();
+}
+new ResizeObserver(rsz).observe(document.getElementById('cw'));
+rsz();
+</script>
+</body>
+</html>
